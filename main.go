@@ -8,6 +8,7 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+	"github.com/kzalys/sensor-control-service/types"
 	"net/http"
 	"os"
 	"time"
@@ -31,17 +32,6 @@ func lookupEnvOrDefault(key, defaultValue string) string {
 	} else {
 		return defaultValue
 	}
-}
-
-type SensorStatus struct {
-	SensorGroup string `json:"sensorGroup" form:"sensorGroup"`
-	SensorAddress string `json:"sensorAddress" form:"sensorAddress"`
-	PushInterval string `json:"pushInterval" form:"pushInterval"`
-	InfluxHost string `json:"influxHost" form:"influxHost"`
-	InfluxPort string `json:"influxPort" form:"influxPort"`
-	InfluxOrg string `json:"influxOrg" form:"influxOrg"`
-	InfluxBucket string `json:"influxBucket" form:"influxBucket"`
-	InfluxToken string `json:"influxToken" form:"influxToken"`
 }
 
 type apiError struct {
@@ -102,7 +92,7 @@ func (*sensorControlService) ServeRoot(ctx *gin.Context) {
 	ctx.HTML(200, "test.gohtml", nil)
 }
 
-func newSensorConfigPoint(sensor SensorStatus) *write.Point {
+func newSensorConfigPoint(sensor types.SensorStatus) *write.Point {
 	return influxdb2.NewPoint(SENSOR_CONFIG_METRIC_NAME, map[string]string{
 		"sensor_group": sensor.SensorGroup,
 	}, map[string]interface{}{
