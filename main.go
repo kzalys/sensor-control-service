@@ -106,7 +106,7 @@ func newSensorConfigPoint(sensor types.SensorStatus) *write.Point {
 }
 
 func (scs *sensorControlService) FetchSensorConfig(ctx *gin.Context) {
-	var sensor SensorStatus
+	var sensor types.SensorStatus
 	err := ctx.BindQuery(&sensor)
 	if err != nil {
 		panic(err)
@@ -160,7 +160,7 @@ func sendPatchRequest(url string, payload interface{}) *http.Response{
 }
 
 func (*sensorControlService) UpdateSensor(ctx *gin.Context) {
-	var sensor SensorStatus
+	var sensor types.SensorStatus
 	err := ctx.Bind(&sensor)
 	if err != nil {
 		panic(err)
