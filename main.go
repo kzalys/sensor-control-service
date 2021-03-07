@@ -8,6 +8,7 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+	"github.com/kzalys/sensor-control-service/consts"
 	"github.com/kzalys/sensor-control-service/types"
 	"net/http"
 	"os"
@@ -24,7 +25,6 @@ const DEFAULT_INFLUXDB_HOST = "http://localhost:8086"
 const ADMIN_USERNAME = "admin"
 const ADMIN_PASSWORD = "admin"
 
-const SENSOR_CONFIG_METRIC_NAME = "sensor_config"
 
 func lookupEnvOrDefault(key, defaultValue string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -93,7 +93,7 @@ func (*sensorControlService) ServeRoot(ctx *gin.Context) {
 }
 
 func newSensorConfigPoint(sensor types.SensorStatus) *write.Point {
-	return influxdb2.NewPoint(SENSOR_CONFIG_METRIC_NAME, map[string]string{
+	return influxdb2.NewPoint(consts.SENSOR_CONFIG_METRIC_NAME, map[string]string{
 		"sensor_group": sensor.SensorGroup,
 	}, map[string]interface{}{
 		"push_interval": sensor.PushInterval,
