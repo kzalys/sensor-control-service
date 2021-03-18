@@ -1,6 +1,6 @@
 var table = new Tabulator("#sensor-list", {
     height: "70%",
-    data: adminData != null && adminData.hasOwnProperty("Sensors") ? adminData.Sensors : [],
+    data: adminData != null && adminData.hasOwnProperty("sensors") ? adminData.sensors : [],
     layout: "fitColumns",
     pagination: "local",
     paginationSize: 20,
