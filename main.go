@@ -17,10 +17,10 @@ import (
 	"time"
 )
 
-const INFLUXDB_HOST = "INFLUXDB_HOST"
-const INFLUXDB_ORG = "INFLUXDB_ORG"
-const INFLUXDB_BUCKET = "INFLUXDB_BUCKET"
-const INFLUXDB_TOKEN = "INFLUXDB_TOKEN"
+const INFLUXDB_HOST_ENV_VAR = "INFLUXDB_HOST"
+const INFLUXDB_ORG_ENV_VAR = "INFLUXDB_ORG"
+const INFLUXDB_BUCKET_ENV_VAR = "INFLUXDB_BUCKET"
+const INFLUXDB_TOKEN_ENV_VAR = "INFLUXDB_TOKEN"
 
 const DEFAULT_INFLUXDB_HOST = "http://localhost:8086"
 
@@ -42,8 +42,8 @@ type apiError struct {
 }
 
 func main() {
-	scs := newSensorControlService(lookupEnvOrDefault(INFLUXDB_HOST, DEFAULT_INFLUXDB_HOST), os.Getenv(INFLUXDB_ORG),
-		os.Getenv(INFLUXDB_BUCKET), os.Getenv(INFLUXDB_TOKEN))
+	scs := newSensorControlService(lookupEnvOrDefault(INFLUXDB_HOST_ENV_VAR, DEFAULT_INFLUXDB_HOST), os.Getenv(INFLUXDB_ORG_ENV_VAR),
+		os.Getenv(INFLUXDB_BUCKET_ENV_VAR), os.Getenv(INFLUXDB_TOKEN_ENV_VAR))
 
 	r := gin.Default()
 

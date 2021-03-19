@@ -1,0 +1,43 @@
+version: '3.5'
+
+services:
+  # Sensor-control-service deployment
+#  scs:
+#    image: sensor-control-service:latest
+#    ports:
+#      - 8000:8000
+#    env_file:
+#      - .env
+#    depends_on:
+#      mongo:
+#        condition: service_healthy
+#    networks:
+#      - internal
+
+  # InfluxDB deployment
+  influxdb:
+    image: influxdb:scs
+    restart: always
+    ports:
+      - 8001:8086
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=$ADMIN_USERNAME
+      - DOCKER_INFLUXDB_INIT_PASSWORD=$ADMIN_PASSWORD
+      - DOCKER_INFLUXDB_INIT_ORG=$INFLUXDB_ORG
+      - DOCKER_INFLUXDB_INIT_BUCKET=$INFLUXDB_BUCKET
+    volumes:
+      - ./data:/var/lib/influxdb
+      - ./scripts/influxdb_initial_setup.sh:/docker-entrypoint-initdb.d/influxdb_initial_setup.sh
+      - credentials:/credentials
+    healthcheck:
+      test:
+        - CMD
+        - /home/influxdb_create_internal_metrics_scrapper.sh
+      interval: 10s
+      timeout: 10s
+      retries: 5
+#    networks:
+#      - internal
+volumes:
+  credentials:

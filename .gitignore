@@ -1,0 +1,2 @@
+*.env
+docker/influxdb/data
