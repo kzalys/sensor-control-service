@@ -4,7 +4,7 @@ WORKDIR /go/src/github.com/kzalys/sensor-control-service
 
 ENV GO111MODULE on
 
-COPY ../.. .
+COPY . .
 
 RUN apk add git
 RUN go mod download

@@ -11,9 +11,11 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/kzalys/sensor-control-service/consts"
 	"github.com/kzalys/sensor-control-service/types"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,6 +23,7 @@ const INFLUXDB_HOST_ENV_VAR = "INFLUXDB_HOST"
 const INFLUXDB_ORG_ENV_VAR = "INFLUXDB_ORG"
 const INFLUXDB_BUCKET_ENV_VAR = "INFLUXDB_BUCKET"
 const INFLUXDB_TOKEN_ENV_VAR = "INFLUXDB_TOKEN"
+const INFLUXDB_TOKEN_PATH_ENV_VAR = "INFLUXDB_TOKEN_PATH"
 
 const DEFAULT_INFLUXDB_HOST = "http://localhost:8086"
 
@@ -36,6 +39,29 @@ func lookupEnvOrDefault(key, defaultValue string) string {
 		return defaultValue
 	}
 }
+func getInfluxDBToken() string {
+	token, ok := os.LookupEnv(INFLUXDB_TOKEN_ENV_VAR)
+	if ok {
+		return token
+	}
+
+	path, ok := os.LookupEnv(INFLUXDB_TOKEN_PATH_ENV_VAR)
+	if ok {
+		tokenFile, err := os.Open(path)
+		if err != nil {
+			panic(err)
+		}
+
+		token, err := ioutil.ReadAll(tokenFile)
+		if err != nil {
+			panic(err)
+		}
+
+		return strings.TrimSpace(string(token))
+	}
+
+	return ""
+}
 
 type apiError struct {
 	Error string `json:"error"`
@@ -43,7 +69,7 @@ type apiError struct {
 
 func main() {
 	scs := newSensorControlService(lookupEnvOrDefault(INFLUXDB_HOST_ENV_VAR, DEFAULT_INFLUXDB_HOST), os.Getenv(INFLUXDB_ORG_ENV_VAR),
-		os.Getenv(INFLUXDB_BUCKET_ENV_VAR), os.Getenv(INFLUXDB_TOKEN_ENV_VAR))
+		os.Getenv(INFLUXDB_BUCKET_ENV_VAR), getInfluxDBToken())
 
 	r := gin.Default()
 
@@ -57,7 +83,7 @@ func main() {
 	root.GET("/", scs.ServeRoot)
 	root.PATCH("/sensors/:sensorGroup", scs.updateSensor)
 	root.GET("/configs", scs.serveSensorConfigs)
-	root.PATCH("/configs/pushIntervals", scs.scalePushIntervals)
+	root.PUT("/configs/pushIntervals", scs.scalePushIntervals)
 
 	r.Run(":8000")
 }
@@ -187,7 +213,22 @@ func sendPatchRequest(url string, payload interface{}) *http.Response {
 }
 
 func (scs *sensorControlService) scalePushIntervals(ctx *gin.Context) {
-	scale, err := strconv.ParseFloat(ctx.Query("scale"), 64)
+	var res struct {
+		Scale float64 `json:"scale"`
+	}
+	if err := ctx.BindJSON(&res); err != nil {
+		ctx.JSON(http.StatusBadRequest, apiError{Error: fmt.Sprintf("could not parse scale: %s", err.Error())})
+		return
+	}
+
+	if res.Scale == 0 {
+		res.Scale, _ = strconv.ParseFloat(ctx.Query("scale"), 64)
+	}
+
+	if res.Scale <= 0 {
+		ctx.JSON(http.StatusBadRequest, apiError{Error: "scale must be a positive float"})
+		return
+	}
 
 	sensors, err := scs.fetchSensorConfigs(ctx)
 	if err != nil {
@@ -197,7 +238,7 @@ func (scs *sensorControlService) scalePushIntervals(ctx *gin.Context) {
 	}
 
 	for _, sensor := range sensors {
-		sensor.PushInterval = int64(float64(sensor.PushInterval) * scale)
+		sensor.PushInterval = int64(float64(sensor.PushInterval) * res.Scale)
 		res := sendPatchRequest(fmt.Sprintf("http://%s/status", sensor.SensorAddress), sensor)
 		if res.StatusCode/100 != 2 {
 			ctx.JSON(http.StatusInternalServerError, apiError{Error: fmt.Sprintf("Updating sensor config failed, "+

@@ -1,18 +1,20 @@
-version: '3.5'
+version: '2.1'
 
 services:
-  # Sensor-control-service deployment
-#  scs:
-#    image: sensor-control-service:latest
-#    ports:
-#      - 8000:8000
-#    env_file:
-#      - .env
-#    depends_on:
-#      mongo:
-#        condition: service_healthy
-#    networks:
-#      - internal
+  scs:
+    image: sensor-control-service:latest
+    ports:
+      - 8000:8000
+    environment:
+      - INFLUXDB_TOKEN_PATH=/credentials/scs_token
+    env_file:
+      - .env
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - credentials:/credentials
+    network_mode: host
 
   # InfluxDB deployment
   influxdb:
