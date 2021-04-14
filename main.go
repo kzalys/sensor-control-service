@@ -32,6 +32,35 @@ const ADMIN_PASSWORD_ENV_VAR = "ADMIN_PASSWORD"
 const DEFAULT_ADMIN_USERNAME = "admin"
 const DEFAULT_ADMIN_PASSWORD = "admin"
 
+const ACTIVE_SENSOR_CONFIGS_QUERY = `
+import "experimental"
+
+sensorConfigs = from(bucket: "iot")
+  |> range(start: -365d, stop: now())
+  |> filter(fn: (r) => r["_measurement"] == "sensor_config")
+  |> pivot(
+    rowKey:["_time"],
+    columnKey: ["_field"],
+    valueColumn: "_value"
+  )	
+  |> group(columns: ["sensor_group"])
+  |> top(n:1, columns: ["_time"])
+  |> drop(columns: ["_time", "_start", "_stop", "_measurement"])
+
+latestPushes = from(bucket: "iot")
+  |> range(start: -365d, stop: now())
+  |> filter(fn: (r) => r["_measurement"] == "sensor_status")
+  |> group(columns: ["sensor_group"])
+  |> top(n:1, columns: ["_time"])
+  |> keep(columns: ["_time", "sensor_group"])
+  |> rename(columns: {_time: "last_data_push"})
+
+join(tables: {d1: sensorConfigs, d2: latestPushes}, on: ["sensor_group"], method: "inner")
+  |>  map(fn: (r) => ({r with data_lateness: float(v: int(v: experimental.subDuration(d: duration(v: int(v:r.last_data_push)), from: now()))) / float(v: r.push_interval) / float(v: 1000000)}))
+  |>  map(fn: (r) => ({r with influx_host: r.influx_host + ":" + r.influx_port}))
+  |> filter(fn: (r) => r.data_lateness < 3)
+  |> drop(columns: ["data_lateness", "last_data_push"])`
+
 func lookupEnvOrDefault(key, defaultValue string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
@@ -132,40 +161,22 @@ func newSensorConfigPoint(sensor types.SensorStatus) *write.Point {
 }
 
 func queryResultToSensorStatuses(result *api.QueryTableResult) []types.SensorStatus {
-	sensors := map[string]*types.SensorStatus{}
-
+	var sensors []types.SensorStatus
 	for result.Next() {
 		record := result.Record()
-		sensorGroup := record.ValueByKey("sensor_group").(string)
 
-		if _, ok := sensors[sensorGroup]; !ok {
-			sensors[sensorGroup] = &types.SensorStatus{
-				SensorGroup: sensorGroup,
-			}
-		}
-
-		switch record.Field() {
-		case "push_interval":
-			sensors[sensorGroup].PushInterval, _ = record.Value().(int64)
-		case "influx_host":
-			sensors[sensorGroup].InfluxHost = record.Value().(string)
-		case "influx_port":
-			sensors[sensorGroup].InfluxPort = record.Value().(string)
-		case "influx_org":
-			sensors[sensorGroup].InfluxOrg = record.Value().(string)
-		case "influx_bucket":
-			sensors[sensorGroup].InfluxBucket = record.Value().(string)
-		case "sensor_address":
-			sensors[sensorGroup].SensorAddress = record.Value().(string)
-		}
+		sensors = append(sensors, types.SensorStatus{
+			SensorGroup:   record.ValueByKey("sensor_group").(string),
+			SensorAddress: record.ValueByKey("sensor_address").(string),
+			PushInterval:  record.ValueByKey("push_interval").(int64),
+			InfluxHost:    record.ValueByKey("influx_host").(string),
+			InfluxPort:    record.ValueByKey("influx_port").(string),
+			InfluxOrg:     record.ValueByKey("influx_org").(string),
+			InfluxBucket:  record.ValueByKey("influx_bucket").(string),
+		})
 	}
 
-	var sensorsArr []types.SensorStatus
-	for _, sensor := range sensors {
-		sensorsArr = append(sensorsArr, *sensor)
-	}
-
-	return sensorsArr
+	return sensors
 }
 
 func (scs *sensorControlService) serveSensorConfigs(ctx *gin.Context) {
@@ -182,7 +193,7 @@ func (scs *sensorControlService) serveSensorConfigs(ctx *gin.Context) {
 func (scs *sensorControlService) fetchSensorConfigs(ctx context.Context) ([]types.SensorStatus, error) {
 	timedCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	result, err := scs.influxQueryApi.Query(timedCtx, fmt.Sprintf(`from(bucket: "%s") |> range(start: -365d) |> filter(fn: (r) => r["_measurement"] == "%s") |> yield(name: "last")`, scs.influxBucket, consts.SENSOR_CONFIG_METRIC_NAME))
+	result, err := scs.influxQueryApi.Query(timedCtx, ACTIVE_SENSOR_CONFIGS_QUERY)
 	if err != nil {
 		return nil, err
 	}
