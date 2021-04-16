@@ -247,7 +247,7 @@
           "noDataState": "no_data",
           "notifications": [
             {
-              "uid": "P5fjeSwMk"
+              "uid": "SCS_NOTIFICATION_CHANNEL_UUID"
             }
           ]
         },

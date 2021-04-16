@@ -59,6 +59,11 @@ fi
 if [ $(curl --write-out '%{http_code}' --silent --output /dev/null http://$GF_SECURITY_ADMIN_USER:$GF_SECURITY_ADMIN_PASSWORD@localhost:8002/api/dashboards/db/system-maintenance) -eq 404 ]; then
   echo "Creating system maintenance dashboard"
   DASHBOARD=`cat /home/system-maintenance-dashboard.json`
-  curl -XPOST -H "Content-type: application/json" -d "${DASHBOARD//INFLUXDB_BUCKET/$INFLUXDB_BUCKET}" "http://$GF_SECURITY_ADMIN_USER:$GF_SECURITY_ADMIN_PASSWORD@localhost:8002/api/dashboards/db"
+  SCS_NOTIFICATION_CHANNEL_UUID=$(curl --silent http://$GF_SECURITY_ADMIN_USER:$GF_SECURITY_ADMIN_PASSWORD@localhost:8002/api/alert-notifications | jq 'select(.[].name | "SCS")[0].uid' --raw-output)
+
+  DASHBOARD=${DASHBOARD//INFLUXDB_BUCKET/$INFLUXDB_BUCKET}
+  DASHBOARD=${DASHBOARD//SCS_NOTIFICATION_CHANNEL_UUID/$SCS_NOTIFICATION_CHANNEL_UUID}
+
+  curl -XPOST -H "Content-type: application/json" -d "$DASHBOARD" "http://$GF_SECURITY_ADMIN_USER:$GF_SECURITY_ADMIN_PASSWORD@localhost:8002/api/dashboards/db"
   echo "Created system maintenance dashboard"
 fi
