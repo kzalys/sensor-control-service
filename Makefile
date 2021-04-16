@@ -11,3 +11,7 @@ down:
 
 cleanup: down
 	docker volume rm sensor-control-service_credentials & true
+
+build:
+	docker build --tag influxdb:scs -f ./docker/influxdb/Dockerfile .
+	docker build --tag sensor-control-service:latest -f docker/scs/Dockerfile .

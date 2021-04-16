@@ -3,10 +3,9 @@ version: '2.1'
 services:
   scs:
     image: sensor-control-service:latest
-    ports:
-      - 8000:8000
     environment:
       - INFLUXDB_TOKEN_PATH=/credentials/scs_token
+      - INFLUXDB_HOST=http://localhost:8001
     env_file:
       - .env
     depends_on:
@@ -29,7 +28,7 @@ services:
       - DOCKER_INFLUXDB_INIT_ORG=$INFLUXDB_ORG
       - DOCKER_INFLUXDB_INIT_BUCKET=$INFLUXDB_BUCKET
     volumes:
-      - ./data:/var/lib/influxdb
+      - influxdb:/var/lib/influxdb
       - ./scripts/influxdb_initial_setup.sh:/docker-entrypoint-initdb.d/influxdb_initial_setup.sh
       - credentials:/credentials
     healthcheck:
@@ -39,7 +38,40 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-#    networks:
-#      - internal
+    networks:
+      - internal
+
+  grafana:
+    image: grafana/grafana:7.5.4-ubuntu
+    user: root
+    environment:
+      - GF_SECURITY_ADMIN_USER=$ADMIN_USERNAME
+      - GF_SECURITY_ADMIN_PASSWORD=$ADMIN_PASSWORD
+      - GF_SERVER_HTTP_PORT=8002
+      - INFLUXDB_ORG=$INFLUXDB_ORG
+      - INFLUXDB_BUCKET=$INFLUXDB_BUCKET
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - /home/grafana_setup_datasources.sh
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - grafana:/var/lib/grafana
+      - credentials:/credentials
+      - ./scripts/grafana_setup_datasources.sh:/home/grafana_setup_datasources.sh
+      - ./scripts/system-maintenance-dashboard.json:/home/system-maintenance-dashboard.json
+    network_mode: host
+
 volumes:
   credentials:
+  influxdb:
+  grafana:
+
+networks:
+  internal:
+    driver: bridge
