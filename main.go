@@ -110,7 +110,7 @@ func main() {
 			DEFAULT_ADMIN_PASSWORD),
 	}))
 	root.GET("/", scs.ServeRoot)
-	root.PATCH("/sensors/:sensorGroup", scs.updateSensor)
+	root.PATCH("/configs/:sensorGroup", scs.updateSensor)
 	root.GET("/configs", scs.serveSensorConfigs)
 	root.PUT("/configs/pushIntervals", scs.scalePushIntervals)
 
